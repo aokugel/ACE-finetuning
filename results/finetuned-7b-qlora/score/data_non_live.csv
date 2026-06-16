@@ -1,0 +1,2 @@
+Rank,Model,Non-Live Overall Acc,AST Summary,Simple AST,Python Simple AST,Java Simple AST,JavaScript Simple AST,Multiple AST,Parallel AST,Parallel Multiple AST,Irrelevance Detection
+1,Qwen2.5-7B-Instruct ToolACE (Prompt),74.31%,N/A,N/A,93.75%,N/A,N/A,97.00%,89.50%,79.50%,89.58%

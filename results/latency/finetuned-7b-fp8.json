@@ -1,0 +1,63 @@
+{
+  "model": "Qwen2.5-7B-Instruct-ToolACE",
+  "max_tokens": 128,
+  "levels": [
+    {
+      "concurrency": 1,
+      "n_requests": 96,
+      "wall_s": 8.94,
+      "ttft_ms": {
+        "p50": 14.3,
+        "p90": 15.6,
+        "p99": 62.7
+      },
+      "e2e_ms": {
+        "p50": 113.2,
+        "p90": 123.0,
+        "p99": 124.0
+      },
+      "tpot_ms_mean": 4.27,
+      "output_tok_per_s": 209.4,
+      "requests_per_s": 10.74,
+      "total_output_tokens": 1872
+    },
+    {
+      "concurrency": 16,
+      "n_requests": 96,
+      "wall_s": 0.792,
+      "ttft_ms": {
+        "p50": 33.2,
+        "p90": 47.0,
+        "p99": 54.1
+      },
+      "e2e_ms": {
+        "p50": 117.4,
+        "p90": 157.9,
+        "p99": 166.4
+      },
+      "tpot_ms_mean": 4.62,
+      "output_tok_per_s": 2364.2,
+      "requests_per_s": 121.24,
+      "total_output_tokens": 1872
+    },
+    {
+      "concurrency": 32,
+      "n_requests": 96,
+      "wall_s": 0.579,
+      "ttft_ms": {
+        "p50": 73.2,
+        "p90": 90.9,
+        "p99": 101.2
+      },
+      "e2e_ms": {
+        "p50": 162.1,
+        "p90": 210.1,
+        "p99": 223.1
+      },
+      "tpot_ms_mean": 5.04,
+      "output_tok_per_s": 3227.9,
+      "requests_per_s": 165.89,
+      "total_output_tokens": 1868
+    }
+  ]
+}

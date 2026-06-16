@@ -1,0 +1,49 @@
+# ===== Large model artifacts (re-download / re-merge; some > GitHub 100MB limit) =====
+models/
+checkpoints/
+*.safetensors
+*.gguf
+*.bin
+*.pt
+
+# ===== Python virtual environments =====
+.venv*/
+venv/
+env/
+
+# ===== Python caches / build =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# ===== Derived training data (regenerate: scripts/prepare_toolace.py) =====
+data/*.jsonl
+data/*.parquet
+*.arrow
+
+# ===== Secrets / machine-local config =====
+.env
+*.env
+.claude/settings.local.json
+
+# ===== BFCL transient dirs auto-created at project root (NOT results/) =====
+/result/
+/score/
+.file_locks/
+
+# ===== Logs / runtime =====
+logs/
+*.log
+*.pid
+nohup.out
+
+# ===== Caches =====
+.cache/
+.hf_cache/
+
+# ===== OS / editor junk =====
+.DS_Store
+*.swp
+.idea/
+.vscode/

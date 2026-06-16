@@ -1,0 +1,63 @@
+{
+  "model": "Qwen2.5-7B-Instruct",
+  "max_tokens": 128,
+  "levels": [
+    {
+      "concurrency": 1,
+      "n_requests": 96,
+      "wall_s": 12.58,
+      "ttft_ms": {
+        "p50": 15.7,
+        "p90": 16.8,
+        "p99": 72.5
+      },
+      "e2e_ms": {
+        "p50": 154.4,
+        "p90": 174.3,
+        "p99": 175.3
+      },
+      "tpot_ms_mean": 6.24,
+      "output_tok_per_s": 148.8,
+      "requests_per_s": 7.63,
+      "total_output_tokens": 1872
+    },
+    {
+      "concurrency": 16,
+      "n_requests": 96,
+      "wall_s": 1.044,
+      "ttft_ms": {
+        "p50": 34.0,
+        "p90": 54.2,
+        "p99": 56.8
+      },
+      "e2e_ms": {
+        "p50": 156.5,
+        "p90": 209.1,
+        "p99": 223.3
+      },
+      "tpot_ms_mean": 6.56,
+      "output_tok_per_s": 1793.5,
+      "requests_per_s": 91.97,
+      "total_output_tokens": 1872
+    },
+    {
+      "concurrency": 32,
+      "n_requests": 96,
+      "wall_s": 0.712,
+      "ttft_ms": {
+        "p50": 70.2,
+        "p90": 86.0,
+        "p99": 96.6
+      },
+      "e2e_ms": {
+        "p50": 187.3,
+        "p90": 251.9,
+        "p99": 268.1
+      },
+      "tpot_ms_mean": 6.74,
+      "output_tok_per_s": 2629.7,
+      "requests_per_s": 134.85,
+      "total_output_tokens": 1872
+    }
+  ]
+}

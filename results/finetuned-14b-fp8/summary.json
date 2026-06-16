@@ -1,0 +1,19 @@
+{
+  "phase": "finetuned-14b-fp8",
+  "non_live_overall": 69.65,
+  "live_overall": 75.8,
+  "python_macro_avg": 78.28,
+  "categories": {
+    "non_live_simple_python": 94.75,
+    "non_live_multiple": 95.0,
+    "non_live_parallel": 88.5,
+    "non_live_parallel_mult": 63.5,
+    "non_live_irrelevance": 85.83,
+    "live_simple": 77.91,
+    "live_multiple": 76.07,
+    "live_parallel": 62.5,
+    "live_parallel_mult": 50.0,
+    "live_irrelevance": 79.52,
+    "live_relevance": 87.5
+  }
+}
