@@ -17,6 +17,8 @@ PHASES = [
     ("finetuned-7b",      "Qwen2.5-7B-Instruct",  "ToolACE LoRA bf16"),
     ("finetuned-7b-fp8",  "Qwen2.5-7B-Instruct",  "ToolACE LoRA fp8"),
     ("finetuned-7b-qlora","Qwen2.5-7B-Instruct",  "ToolACE QLoRA bf16"),
+    ("baseline-qwen35-9b","Qwen3.5-9B",           "baseline bf16 (thinking)"),
+    ("baseline-qwen35-9b-nothink","Qwen3.5-9B",   "baseline bf16 (no-think)"),
     ("baseline-14b",      "Qwen2.5-14B-Instruct", "baseline bf16"),
     ("finetuned-14b",     "Qwen2.5-14B-Instruct", "ToolACE LoRA bf16 (uniform)"),
     ("finetuned-14b-fp8", "Qwen2.5-14B-Instruct", "ToolACE LoRA fp8"),

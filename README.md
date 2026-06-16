@@ -34,6 +34,9 @@ serving metrics at **32 concurrent requests** on one H100. See [Results](#result
 - **FP8** serving buys **+24% throughput / −13% latency** at −0.36 pt accuracy (noise).
 - **14B:** the base is already excellent (82.6) and ToolACE SFT **hurts** it (catastrophic forgetting of
   parallel-multiple); even a lighter recipe (80.8) trails baseline. → don't fine-tune the 14B here.
+- **Newer ≠ better for this task:** the much newer multimodal **Qwen3.5-9B** scores only **74.9** macro
+  (no-think) — *below* the older, FC-specialized Qwen2.5-7B (79.5) — and is slower. See
+  [Candidate base: Qwen3.5-9B](#candidate-base-qwen35-9b-no-fine-tune).
 
 ## Recommendation
 
@@ -68,6 +71,14 @@ The client needs the **best achievable tool-calling accuracy** that still serves
 We carry **two sizes** to make the accuracy-vs-latency tradeoff explicit:
 **7B** = the latency/cost-optimal candidate, **14B** = the accuracy-optimal
 candidate. The client can pick the point on the curve that fits their SLA.
+
+We also **baseline-evaluated a newer candidate, the multimodal Qwen3.5-9B**
+(Feb 2026, Apache-2.0), to check whether a more recent generation would be a
+better starting point. It was not — it scored lower on BFCL-python *and* served
+slower, so we kept Qwen2.5 as the base. Details in
+[Candidate base: Qwen3.5-9B](#candidate-base-qwen35-9b-no-fine-tune). This is the
+right selection process per Task 1a ("fine-tune the *most suitable* model"):
+evaluate candidates, then commit.
 
 ## 2. Dataset — Team-ACE/ToolACE
 
@@ -141,19 +152,26 @@ We always **merge** the adapter back into bf16 weights before serving
 
 ```
 scripts/
-  register_bfcl_models.py   register our 4 models into the bfcl-eval registry
-  prepare_toolace.py        ToolACE -> chat-formatted train/val JSONL
-  train_sft.py              LoRA / QLoRA SFT (assistant-only loss)
-  merge_lora.py             merge adapter -> bf16 weights for serving
-  serve_vllm.sh             vLLM server (bf16 or fp8)
-  run_bfcl.sh               BFCL generate + evaluate (python subset) vs server
-  benchmark_latency.py      TTFT / latency / throughput @ concurrency 1/16/32
-  run_pipeline.sh           full per-size pipeline orchestration
-  kill_server.sh            stop the vLLM server safely
-data/                       prepared JSONL (+ smoke subsets)
-results/<phase>/{result,score}/   BFCL outputs & scores per phase
-results/latency/            latency benchmark JSON
-logs/                       server logs
+  setup_env.sh                 create the 3 venvs + system deps + patches
+  register_bfcl_models.py      register base+ToolACE (7B/14B) + Qwen3.5-9B into BFCL
+  register_qwen35_nothink.py   no-think handler + model for Qwen3.5-9B
+  patch_vllm_metrics.py        fix prometheus-instrumentator vs Starlette 1.3
+  prepare_toolace.py           ToolACE -> chat-formatted train/val JSONL
+  train_sft.py                 LoRA / QLoRA SFT (assistant-only loss, nan-skip)
+  merge_lora.py                merge adapter -> bf16 weights for serving
+  serve_vllm.sh                vLLM server (bf16 or fp8)
+  run_bfcl.sh                  BFCL generate + evaluate (python subset) vs server
+  benchmark_latency.py         TTFT / latency / throughput @ conc 1/16/32 (+--no-think)
+  serve_eval_bench.sh          serve -> eval -> benchmark -> stop (one phase)
+  run_pipeline.sh              full per-size pipeline orchestration
+  summarize_results.py         per-phase BFCL score -> python-subset summary
+  make_report.py               aggregate all phases -> results/REPORT.md
+  kill_server.sh               stop the vLLM server + free GPU safely
+data/                          prepared JSONL
+results/<phase>/{result,score}/  BFCL outputs & scores per phase (+ summary.json)
+results/REPORT.md              consolidated comparison table (all models)
+results/latency/               latency benchmark JSON
+logs/                          server logs
 ```
 
 ## How to reproduce
@@ -272,6 +290,38 @@ quality, far cheaper to train, and you can fit much larger models or batches on
 the same GPU. (We merge the adapter back to bf16 for serving either way, so
 inference quality/speed is identical.)
 
+### Candidate base: Qwen3.5-9B (no fine-tune)
+
+We evaluated **Qwen/Qwen3.5-9B** (newer, multimodal, Apache-2.0, thinking-by-default)
+as an alternative base — served on the same vLLM stack, scored on the same BFCL
+python subset in prompt mode. Because BFCL prompt-mode hits `/v1/completions` with
+a hand-built ChatML prompt (the model's `enable_thinking` flag never applies), we
+added a small no-think handler that prefills an empty `<think></think>` block
+([`scripts/register_qwen35_nothink.py`](scripts/register_qwen35_nothink.py)) and
+ran it both ways.
+
+| Config | Macro | Non-Live | Live | E2E p50 @32 | tok/s @32 | req/s @32 |
+|---|--:|--:|--:|--:|--:|--:|
+| Qwen3.5-9B (thinking, default) | 74.98 | 73.0 | 62.6 | 1232 ms | 2942 | 25 |
+| Qwen3.5-9B (no-think) | 74.93 | 73.0 | 62.9 | 353 ms | 1438 | 74 |
+| **Qwen2.5-7B baseline** (ref) | **79.52** | 75.3 | 75.4 | **187 ms** | 2630 | **135** |
+| **Qwen2.5-14B baseline** (ref) | **82.60** | 75.6 | 74.2 | 307 ms | 1600 | 82 |
+
+Findings:
+- **Thinking is a latency tax, not an accuracy lever here**: disabling it left macro
+  flat (74.93 vs 74.98) but cut E2E latency ~3.5× and tripled throughput.
+- **Even at its best (no-think), Qwen3.5-9B trails Qwen2.5-7B by ~4.6 pts** and the
+  14B by ~7.7, *and* serves slower than the 7B. It is weakest on irrelevance /
+  relevance (live_irrelevance 52.6, live_multiple 60.9) — i.e. deciding *whether*
+  / *which* to call — while competitive on parallel calls (non-live parallel 90.5).
+- Why: it's a larger multimodal generalist (9B + vision tower, 248K vocab), not an
+  FC-specialized instruct model like Qwen2.5.
+
+Takeaway: a newer/bigger generation is **not** automatically better for a narrow
+skill like function calling. Qwen3.5-9B is a poor *baseline*, but — having the most
+headroom of anything tested — it is the most interesting *future fine-tuning*
+candidate (provided thinking is kept off in production to control latency).
+
 ### Training configuration
 
 LoRA: r=16, α=32, dropout=0.05 on `q,k,v,o,gate,up,down`; bf16; **2 epochs**;
@@ -316,11 +366,13 @@ length-grouped batching; **non-finite-grad skipping**. 7B: 40.4M trainable
 
 4. **Registering custom models in BFCL.** BFCL ships Qwen3 but not Qwen2.5 and
    obviously not our checkpoints. I wrote an idempotent
-   [`register_bfcl_models.py`](scripts/register_bfcl_models.py) that injects four
-   `ModelConfig` entries (base + ToolACE, 7B + 14B) into the prompt-mode handler,
-   and serve each under a matching `--served-model-name` so BFCL's
-   `--skip-server-setup` path hits our own vLLM server (with
-   `REMOTE_OPENAI_TOKENIZER_PATH` pointing at local weights for token counting).
+   [`register_bfcl_models.py`](scripts/register_bfcl_models.py) that injects
+   `ModelConfig` entries (base + ToolACE for 7B/14B, plus the Qwen3.5-9B
+   candidate) into the prompt-mode handler, and serve each under a matching
+   `--served-model-name` so BFCL's `--skip-server-setup` path hits our own vLLM
+   server (with `REMOTE_OPENAI_TOKENIZER_PATH` pointing at local weights for token
+   counting). A custom no-think handler for Qwen3.5 lives in
+   [`register_qwen35_nothink.py`](scripts/register_qwen35_nothink.py).
 
 5. **Serving-stack reality.** vLLM 0.23's `torch.compile` path needed system
    `python3-dev` + `ninja`; and its bundled `prometheus-fastapi-instrumentator`

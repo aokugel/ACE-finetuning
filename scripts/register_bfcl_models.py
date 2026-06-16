@@ -32,6 +32,8 @@ MODELS = [
     ("Qwen2.5-14B-Instruct",         "Qwen2.5-14B-Instruct (Prompt)",         "https://huggingface.co/Qwen/Qwen2.5-14B-Instruct"),
     ("Qwen2.5-7B-Instruct-ToolACE",  "Qwen2.5-7B-Instruct ToolACE (Prompt)",  "local-finetune"),
     ("Qwen2.5-14B-Instruct-ToolACE", "Qwen2.5-14B-Instruct ToolACE (Prompt)", "local-finetune"),
+    # Additional candidate base (no fine-tune) — newer/stronger generation, evaluated for comparison.
+    ("Qwen3.5-9B",                   "Qwen3.5-9B (Prompt)",                   "https://huggingface.co/Qwen/Qwen3.5-9B"),
 ]
 
 ENTRY_TMPL = '''    "{key}": ModelConfig(

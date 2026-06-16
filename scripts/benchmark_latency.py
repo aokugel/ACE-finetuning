@@ -51,11 +51,12 @@ def pct(xs, p):
     return statistics.quantiles(xs, n=100)[p - 1] if len(xs) > 1 else xs[0]
 
 
-async def one_request(client, model, idx, max_tokens):
+async def one_request(client, model, idx, max_tokens, no_think=False):
     user = USER_PROMPTS[idx % len(USER_PROMPTS)]
     t0 = time.perf_counter()
     ttft = None
     n_out = 0
+    extra = {"chat_template_kwargs": {"enable_thinking": False}} if no_think else {}
     stream = await client.chat.completions.create(
         model=model,
         messages=[{"role": "system", "content": SYSTEM},
@@ -64,6 +65,7 @@ async def one_request(client, model, idx, max_tokens):
         max_tokens=max_tokens,
         stream=True,
         stream_options={"include_usage": True},
+        extra_body=extra,
     )
     async for chunk in stream:
         if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
@@ -76,13 +78,13 @@ async def one_request(client, model, idx, max_tokens):
     return {"ttft": ttft, "e2e": e2e, "n_out": max(n_out, 1)}
 
 
-async def run_level(client, model, concurrency, n_requests, max_tokens):
+async def run_level(client, model, concurrency, n_requests, max_tokens, no_think=False):
     sem = asyncio.Semaphore(concurrency)
     results = []
 
     async def worker(i):
         async with sem:
-            results.append(await one_request(client, model, i, max_tokens))
+            results.append(await one_request(client, model, i, max_tokens, no_think))
 
     t0 = time.perf_counter()
     await asyncio.gather(*[worker(i) for i in range(n_requests)])
@@ -117,18 +119,19 @@ async def main():
     ap.add_argument("--concurrency", type=int, nargs="+", default=[1, 16, 32])
     ap.add_argument("--requests-per-level", type=int, default=96)
     ap.add_argument("--max-tokens", type=int, default=128)
+    ap.add_argument("--no-think", action="store_true", help="disable Qwen3 thinking via chat_template_kwargs")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
     client = AsyncOpenAI(base_url=f"http://localhost:{args.port}/v1", api_key="EMPTY")
 
     # warmup
-    await one_request(client, args.model, 0, 16)
+    await one_request(client, args.model, 0, 16, args.no_think)
 
     levels = []
     for c in args.concurrency:
         print(f">>> concurrency={c} ...", flush=True)
-        res = await run_level(client, args.model, c, args.requests_per_level, args.max_tokens)
+        res = await run_level(client, args.model, c, args.requests_per_level, args.max_tokens, args.no_think)
         print(json.dumps(res, indent=2))
         levels.append(res)
 
