@@ -1,0 +1,19 @@
+{
+  "phase": "baseline-qwen35-9b",
+  "non_live_overall": 73.0,
+  "live_overall": 62.62,
+  "python_macro_avg": 74.98,
+  "categories": {
+    "non_live_simple_python": 84.0,
+    "non_live_multiple": 87.5,
+    "non_live_parallel": 90.5,
+    "non_live_parallel_mult": 86.0,
+    "non_live_irrelevance": 64.58,
+    "live_simple": 70.16,
+    "live_multiple": 60.4,
+    "live_parallel": 75.0,
+    "live_parallel_mult": 70.83,
+    "live_irrelevance": 54.52,
+    "live_relevance": 81.25
+  }
+}
