@@ -199,19 +199,19 @@ rows of `results/REPORT.md` were produced by:
 
 ```bash
 # 7B QLoRA ablation (method comparison)
-python scripts/train_sft.py --base-model models/Qwen2.5-7B-Instruct \
+.venv-train/bin/python scripts/train_sft.py --base-model models/Qwen2.5-7B-Instruct \
   --output-dir checkpoints/Qwen2.5-7B-Instruct-qlora --method qlora \
   --epochs 2 --lr 1e-4 --per-device-batch 8 --grad-accum 4 --max-len 4096
-python scripts/merge_lora.py --base-model models/Qwen2.5-7B-Instruct \
+.venv-train/bin/python scripts/merge_lora.py --base-model models/Qwen2.5-7B-Instruct \
   --adapter checkpoints/Qwen2.5-7B-Instruct-qlora --out models/Qwen2.5-7B-Instruct-QLoRA
 bash scripts/serve_eval_bench.sh models/Qwen2.5-7B-Instruct-QLoRA Qwen2.5-7B-Instruct-ToolACE \
   finetuned-7b-qlora none models/Qwen2.5-7B-Instruct-QLoRA 8000 64 0   # last arg 0 = skip latency
 
 # 14B "lighter" retry (lr 5e-5, 1 epoch — recovers some of the forgetting)
-python scripts/train_sft.py --base-model models/Qwen2.5-14B-Instruct \
+.venv-train/bin/python scripts/train_sft.py --base-model models/Qwen2.5-14B-Instruct \
   --output-dir checkpoints/Qwen2.5-14B-Instruct-lora-light --method lora \
   --epochs 1 --lr 5e-5 --per-device-batch 4 --grad-accum 8 --max-len 4096
-python scripts/merge_lora.py --base-model models/Qwen2.5-14B-Instruct \
+.venv-train/bin/python scripts/merge_lora.py --base-model models/Qwen2.5-14B-Instruct \
   --adapter checkpoints/Qwen2.5-14B-Instruct-lora-light --out models/Qwen2.5-14B-Instruct-ToolACE-light
 bash scripts/serve_eval_bench.sh models/Qwen2.5-14B-Instruct-ToolACE-light Qwen2.5-14B-Instruct-ToolACE \
   finetuned-14b-light none models/Qwen2.5-14B-Instruct-ToolACE-light 8000 48 0

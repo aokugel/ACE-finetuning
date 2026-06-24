@@ -29,6 +29,12 @@ ADAPTER="checkpoints/${KEY}-lora"
 MERGED="models/${FTKEY}"
 PORT=8000
 
+# Each stage runs from the venv that holds its deps (they intentionally conflict:
+# train pins torch 2.12 + peft/bitsandbytes; the benchmark only needs `openai`,
+# which lives in the vLLM venv). serve_vllm.sh / run_bfcl.sh pick their own venv.
+PY_TRAIN=".venv-train/bin/python"   # train_sft.py, merge_lora.py
+PY_BENCH=".venv-vllm/bin/python"    # benchmark_latency.py (needs openai client)
+
 wait_ready() {  # $1 = served name
   for _ in $(seq 1 200); do
     curl -s "http://localhost:${PORT}/v1/models" 2>/dev/null | grep -q "$1" && return 0
@@ -47,28 +53,28 @@ stop_server() { bash scripts/kill_server.sh; }
 # ---------- 1. baseline ----------
 start_server "$BASE" "$KEY" none
 scripts/run_bfcl.sh "$KEY" "baseline-${SIZE}" "$PORT" python 16 "$BASE"
-python scripts/benchmark_latency.py --model "$KEY" --port "$PORT" \
+"$PY_BENCH" scripts/benchmark_latency.py --model "$KEY" --port "$PORT" \
   --concurrency 1 16 32 --requests-per-level 96 --out "results/latency/${SIZE}_baseline_bf16.json"
 stop_server
 
 # ---------- 2. train + merge ----------
 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-python scripts/train_sft.py --base-model "$BASE" --output-dir "$ADAPTER" \
+"$PY_TRAIN" scripts/train_sft.py --base-model "$BASE" --output-dir "$ADAPTER" \
   --method lora --epochs 2 --lr 1e-4 --warmup-ratio 0.05 --max-grad-norm 1.0 \
   --per-device-batch "$PDB" --grad-accum "$GA" --max-len 4096 --grad-checkpointing 1
-python scripts/merge_lora.py --base-model "$BASE" --adapter "$ADAPTER" --out "$MERGED"
+"$PY_TRAIN" scripts/merge_lora.py --base-model "$BASE" --adapter "$ADAPTER" --out "$MERGED"
 
 # ---------- 3. finetuned (bf16) ----------
 start_server "$MERGED" "$FTKEY" none
 scripts/run_bfcl.sh "$FTKEY" "finetuned-${SIZE}" "$PORT" python 16 "$MERGED"
-python scripts/benchmark_latency.py --model "$FTKEY" --port "$PORT" \
+"$PY_BENCH" scripts/benchmark_latency.py --model "$FTKEY" --port "$PORT" \
   --concurrency 1 16 32 --requests-per-level 96 --out "results/latency/${SIZE}_finetuned_bf16.json"
 stop_server
 
 # ---------- 4. optimized (fp8) ----------
 start_server "$MERGED" "$FTKEY" fp8
 scripts/run_bfcl.sh "$FTKEY" "finetuned-${SIZE}-fp8" "$PORT" python 16 "$MERGED"
-python scripts/benchmark_latency.py --model "$FTKEY" --port "$PORT" \
+"$PY_BENCH" scripts/benchmark_latency.py --model "$FTKEY" --port "$PORT" \
   --concurrency 1 16 32 --requests-per-level 96 --out "results/latency/${SIZE}_finetuned_fp8.json"
 stop_server
 
