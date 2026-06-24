@@ -177,15 +177,62 @@ logs/                          server logs
 ## How to reproduce
 
 ```bash
-# 0. one-time setup
-bash scripts/setup_env.sh                 # creates the 3 venvs, installs deps
-.venv-bfcl/bin/python scripts/register_bfcl_models.py
+# 0. one-time setup: creates 3 isolated venvs from the PINNED requirements-*.txt
+#    files, applies the vLLM-metrics patch, and registers models in BFCL.
+bash scripts/setup_env.sh
 .venv-train/bin/python scripts/prepare_toolace.py
 
 # 1. full pipeline (baseline -> train -> finetuned -> fp8) for each size
 bash scripts/run_pipeline.sh 7b
 bash scripts/run_pipeline.sh 14b
 ```
+
+> **Exact-version reproducibility:** each venv is pinned via `requirements-train.txt`,
+> `requirements-vllm.txt`, `requirements-bfcl.txt` (frozen from the working H100/CUDA-13
+> env). They're separate because the stages need *conflicting* deps — e.g. training pins
+> `torch==2.12.0` while vLLM pins `torch==2.11.0`.
+
+### Reproducing the ablations & candidate models
+
+`run_pipeline.sh` covers the per-size **baseline → LoRA → FP8** path. The remaining
+rows of `results/REPORT.md` were produced by:
+
+```bash
+# 7B QLoRA ablation (method comparison)
+python scripts/train_sft.py --base-model models/Qwen2.5-7B-Instruct \
+  --output-dir checkpoints/Qwen2.5-7B-Instruct-qlora --method qlora \
+  --epochs 2 --lr 1e-4 --per-device-batch 8 --grad-accum 4 --max-len 4096
+python scripts/merge_lora.py --base-model models/Qwen2.5-7B-Instruct \
+  --adapter checkpoints/Qwen2.5-7B-Instruct-qlora --out models/Qwen2.5-7B-Instruct-QLoRA
+bash scripts/serve_eval_bench.sh models/Qwen2.5-7B-Instruct-QLoRA Qwen2.5-7B-Instruct-ToolACE \
+  finetuned-7b-qlora none models/Qwen2.5-7B-Instruct-QLoRA 8000 64 0   # last arg 0 = skip latency
+
+# 14B "lighter" retry (lr 5e-5, 1 epoch — recovers some of the forgetting)
+python scripts/train_sft.py --base-model models/Qwen2.5-14B-Instruct \
+  --output-dir checkpoints/Qwen2.5-14B-Instruct-lora-light --method lora \
+  --epochs 1 --lr 5e-5 --per-device-batch 4 --grad-accum 8 --max-len 4096
+python scripts/merge_lora.py --base-model models/Qwen2.5-14B-Instruct \
+  --adapter checkpoints/Qwen2.5-14B-Instruct-lora-light --out models/Qwen2.5-14B-Instruct-ToolACE-light
+bash scripts/serve_eval_bench.sh models/Qwen2.5-14B-Instruct-ToolACE-light Qwen2.5-14B-Instruct-ToolACE \
+  finetuned-14b-light none models/Qwen2.5-14B-Instruct-ToolACE-light 8000 48 0
+
+# Qwen3.5-9B candidate baseline (thinking + no-think); register_qwen35_nothink.py runs in setup_env.sh
+.venv-train/bin/hf download Qwen/Qwen3.5-9B --local-dir models/Qwen3.5-9B
+bash scripts/serve_vllm.sh models/Qwen3.5-9B Qwen3.5-9B 8000 none 16384 64 &   # serve, then:
+bash scripts/run_bfcl.sh Qwen3.5-9B         baseline-qwen35-9b         8000 python 16 models/Qwen3.5-9B
+bash scripts/run_bfcl.sh Qwen3.5-9B-nothink baseline-qwen35-9b-nothink 8000 python 16 models/Qwen3.5-9B
+```
+
+### Determinism & data versions
+
+- Training sets `seed=42` with a fixed 98/2 split, and eval uses near-greedy decoding
+  (temp 0.001) — so results reproduce **within run-to-run variance, not bit-exact**
+  (CUDA kernels and vLLM batching aren't fully deterministic by default). Expected
+  macro accuracies are recorded in `results/REPORT.md`.
+- The **BFCL eval data is pinned** by `bfcl-eval==2026.3.23`. To fully pin the *training*
+  data as well, pass a dataset `revision=<commit-sha>` to `load_dataset` in
+  `prepare_toolace.py` (and `--revision` on the base-model `hf download`s) — currently
+  they track the latest revision on the Hub.
 
 ## Environment
 

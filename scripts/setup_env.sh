@@ -16,16 +16,18 @@ command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 
 # --- 1) training venv ---
+# Pins captured from the working env (requirements-train.txt). These target the
+# H100 / CUDA-13 box; on a different GPU/CUDA, if torch can't resolve a CUDA build
+# add: --extra-index-url https://download.pytorch.org/whl/cu130
 uv venv .venv-train --python 3.12
 source .venv-train/bin/activate
-uv pip install torch transformers trl peft datasets accelerate bitsandbytes \
-               sentencepiece "huggingface_hub" hf_transfer
+uv pip install -r requirements-train.txt
 deactivate
 
 # --- 2) vLLM serving venv ---
 uv venv .venv-vllm --python 3.12
 source .venv-vllm/bin/activate
-uv pip install vllm
+uv pip install -r requirements-vllm.txt
 deactivate
 # Patch prometheus-fastapi-instrumentator for Starlette 1.3.x (see script docstring)
 .venv-vllm/bin/python scripts/patch_vllm_metrics.py
@@ -33,10 +35,11 @@ deactivate
 # --- 3) BFCL eval venv ---
 uv venv .venv-bfcl --python 3.12
 source .venv-bfcl/bin/activate
-uv pip install bfcl-eval soundfile   # soundfile: transitive dep of qwen_agent import chain
+uv pip install -r requirements-bfcl.txt   # incl. soundfile (qwen_agent import chain)
 deactivate
-# Register our 4 models (base + ToolACE, 7B + 14B) into the BFCL registry
+# Register models into the BFCL registry: base + ToolACE (7B/14B) + Qwen3.5-9B candidate
 .venv-bfcl/bin/python scripts/register_bfcl_models.py
+.venv-bfcl/bin/python scripts/register_qwen35_nothink.py
 
 # --- model downloads ---
 export HF_HUB_ENABLE_HF_TRANSFER=1
